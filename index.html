@@ -461,7 +461,7 @@
       .planned {
         min-height: 145px;
         padding: 10px;
-        cursor: grab;
+        cursor: pointer;
         overflow: hidden;
         transition: 0.18s ease;
       }
@@ -548,8 +548,8 @@
       }
       .tabs {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 3px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
         padding: 4px;
         margin-bottom: 16px;
         border-radius: 12px;
@@ -561,7 +561,7 @@
         padding: 9px;
         background: transparent;
         color: #748078;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 800;
       }
       .tabs button.active {
@@ -670,16 +670,14 @@
         margin-top: 3px;
         font-size: 14px;
       }
-      .picker-list,
-      .shopping-list {
+      .picker-list {
         display: flex;
         flex-direction: column;
         gap: 6px;
         max-height: 52vh;
         overflow-y: auto;
       }
-      .picker-list button,
-      .shopping-item {
+      .picker-list button {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -702,53 +700,99 @@
         color: var(--muted);
         font-size: 9px;
       }
-      .shopping-toolbar {
+
+      /* Stile ottimizzato e coerente per la Lista della Spesa */
+      .shopping-view-container {
+        padding: 4px 0 20px;
+      }
+      .shopping-card-box {
+        background: var(--card);
+        border: 1px solid rgba(255, 255, 255, 0.98);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 8px 24px rgba(43, 57, 49, 0.08);
+      }
+      .shopping-header-row {
         display: flex;
         justify-content: space-between;
-        gap: 8px;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 12px;
       }
-      .shopping-toolbar p {
-        color: var(--muted);
-        font-size: 10px;
+      .shopping-list-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: calc(100vh - 260px);
+        overflow-y: auto;
+        padding-right: 4px;
       }
-      .shopping-item {
-        justify-content: flex-start;
+      .shopping-item-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid var(--line);
+        padding: 11px 14px;
+        border-radius: 12px;
+        transition: 0.15s;
       }
-      .shopping-item input {
-        width: 17px;
-        height: 17px;
-        flex: none;
-        accent-color: #5f856a;
-      }
-      .shopping-item label {
-        flex: 1;
-      }
-      .shopping-item strong,
-      .shopping-item span {
-        display: block;
-      }
-      .shopping-item strong {
-        font-size: 11px;
-      }
-      .shopping-item span {
-        color: var(--muted);
-        font-size: 9px;
-        margin-top: 2px;
-      }
-      .shopping-item.checked {
+      .shopping-item-row.checked {
         opacity: 0.55;
+        background: rgba(240, 244, 241, 0.6);
       }
-      .shopping-item.checked strong {
+      .shopping-item-row.checked strong {
         text-decoration: line-through;
       }
-      .category {
-        margin: 12px 3px 5px;
-        color: #718078;
+      .shopping-item-left {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        cursor: pointer;
+        flex: 1;
+        min-width: 0;
+      }
+      .shopping-item-left input[type="checkbox"] {
+        width: 17px;
+        height: 17px;
+        accent-color: #538063;
+        cursor: pointer;
+        flex: none;
+      }
+      .shopping-item-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .shopping-item-info strong {
+        font-size: 12px;
+        color: var(--ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .shopping-item-info span {
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .shopping-category-badge {
         font-size: 8px;
+        background: var(--sage-soft);
+        color: var(--sage);
+        padding: 3px 8px;
+        border-radius: 99px;
         font-weight: 800;
-        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        flex: none;
+      }
+      .category-title-header {
+        margin: 14px 4px 6px;
+        color: #5c6c63;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
       .empty-state {
@@ -1008,7 +1052,7 @@
         }
         .tabs button {
           padding-inline: 4px;
-          font-size: 9px;
+          font-size: 10px;
         }
       }
     </style>
@@ -1064,6 +1108,31 @@
         </div>
         <div class="mobile-days" id="mobileDays"></div>
         <div class="week-grid" id="weekGrid"></div>
+      </main>
+
+      <!-- Vista Lista della Spesa dedicata per Desktop e Mobile -->
+      <main class="planner" id="shoppingMain" style="display: none;">
+        <div class="planner-title">
+          <div>
+            <p class="eyebrow">Approvvigionamento</p>
+            <h1>Lista della spesa</h1>
+          </div>
+          <div class="planner-controls">
+            <button class="btn primary" id="generateShoppingFromMain">Genera con AI</button>
+          </div>
+        </div>
+        <div class="shopping-view-container">
+          <div class="shopping-card-box glass">
+            <div class="shopping-header-row">
+              <div>
+                <strong style="font-size: 14px; color: var(--ink);">Ingredienti necessari</strong>
+                <p style="font-size: 10px; color: var(--muted); margin-top: 2px;">Aggiornati in base ai pasti pianificati</p>
+              </div>
+              <span class="count" id="shoppingMainMeta">0 acquistati</span>
+            </div>
+            <div id="shoppingMainContent"></div>
+          </div>
+        </div>
       </main>
     </div>
 
@@ -1186,6 +1255,7 @@
       </div>
     </div>
 
+    <!-- Modale AI Sync ridotta a 2 tab (Esporta e Importa) -->
     <div class="overlay" id="aiOverlay" hidden>
       <div class="modal glass">
         <div class="modal-head">
@@ -1198,12 +1268,10 @@
         <div class="tabs" id="aiTabs">
           <button data-tab="export" class="active">1. Esporta</button>
           <button data-tab="import">2. Importa</button>
-          <button data-tab="shopping">3. Lista spesa</button>
         </div>
         <section class="tab-panel" data-panel="export">
           <div class="info">
-            Il file contiene pasti, piano, obiettivi nutrizionali (inclusi quelli day-by-day) e la sezione
-            <strong>shoppingList</strong> integrata. Condividilo con il tuo Gem.
+            Il file contiene pasti, piano, obiettivi nutrizionali e la sezione <strong>shoppingList</strong> integrata. Copia questo prompt e incollalo nel tuo Gem per aggiornare dati o generare la lista della spesa.
           </div>
           <label class="field"
             >Prompt + dati<textarea class="code" id="exportText" rows="16" readonly></textarea>
@@ -1218,8 +1286,7 @@
         </section>
         <section class="tab-panel" data-panel="import" hidden>
           <div class="info">
-            Incolla il JSON restituito dal Gem. Gli slot già completati vengono preservati se non
-            sono stati esplicitamente sostituiti, e la lista della spesa viene aggiornata.
+            Incolla il JSON restituito dal Gem. Gli slot già completati e la lista della spesa verranno aggiornati intelligentemente.
           </div>
           <label class="field"
             >Risposta JSON<textarea
@@ -1235,41 +1302,6 @@
             ><button class="btn primary" id="applyImportBtn" disabled>Applica Smart Merge</button>
           </div>
         </section>
-        <section class="tab-panel" data-panel="shopping" hidden>
-          <div class="info">
-            Copia questo prompt per chiedere al Gem di generare o aggiornare soltanto la lista della
-            spesa, aggregando quantità e ingredienti dei pasti pianificati.
-          </div>
-          <label class="field"
-            >Prompt lista della spesa<textarea
-              class="code"
-              id="shoppingPrompt"
-              rows="16"
-              readonly
-            ></textarea>
-          </label>
-          <div class="modal-foot">
-            <span></span
-            ><button class="btn primary" id="copyShoppingPrompt">Copia richiesta lista</button>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <div class="overlay" id="shoppingOverlay" hidden>
-      <div class="modal small glass">
-        <div class="modal-head">
-          <div>
-            <p class="eyebrow">Settimana corrente</p>
-            <h2>Lista della spesa</h2>
-          </div>
-          <button class="icon-button" data-close="shoppingOverlay">×</button>
-        </div>
-        <div class="shopping-toolbar">
-          <p id="shoppingMeta"></p>
-          <button class="btn" id="generateShoppingBtn">Genera con AI</button>
-        </div>
-        <div id="shoppingContent"></div>
       </div>
     </div>
 
@@ -1295,7 +1327,7 @@
       (() => {
         "use strict";
 
-        // CONFIGURAZIONE SUPABASE (Inserisci qui le tue credenziali)
+        // CONFIGURAZIONE SUPABASE
         const SUPABASE_URL = "https://kogxpropzaadlpotnnyr.supabase.co";
         const SUPABASE_KEY = "sb_publishable_wXNPcQNWaUeLqbZJWxqfQg_lh7bqZmb";
         
@@ -1314,8 +1346,8 @@
           ["sun", "Dom", "Domenica"],
         ];
         const SLOTS = ["lunch", "dinner"];
-        const STORE = "survive-state-v4";
-        const HISTORY = "survive-history-v4";
+        const STORE = "survive-state-v5";
+        const HISTORY = "survive-history-v5";
 
         const initialMeals = [
           {
@@ -1474,7 +1506,6 @@
           localStorage.setItem(HISTORY, JSON.stringify(history));
         }
 
-        // Sincronizzazione Cloud con Supabase
         async function syncToCloud() {
           saveLocal();
           if (!supabaseClient) return;
@@ -1490,7 +1521,7 @@
         async function initCloudSync() {
           if (!supabaseClient) return;
           try {
-            const { data, error } = await supabaseClient
+            const { data } = await supabaseClient
               .from('survive_store')
               .select('state')
               .eq('id', 'main')
@@ -1598,6 +1629,7 @@
               rules: [
                 "Mantieni gli id dei pasti esistenti e genera id univoci per i nuovi.",
                 "Non cambiare completed:true salvo richiesta esplicita.",
+                "Per la lista della spesa usa i pasti assegnati, aggrega quantità e ingredienti, e raggruppa per categoria in shoppingList.items.",
                 "Restituisci sempre l'intero oggetto JSON valido, senza markdown.",
               ],
               shoppingListSchema: {
@@ -1618,11 +1650,7 @@
         }
 
         function mainPrompt() {
-          return `Sei l'assistente dati dell'app Survive. Applica esclusivamente le modifiche richieste a pasti, piano settimanale, obiettivi o lista spesa. Mantieni tutti gli id esistenti e gli slot completed:true. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
-        }
-
-        function listPrompt() {
-          return `Genera shoppingList.items basandoti sui pasti nello schedule del JSON seguente. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
+          return `Sei l'assistente dati dell'app Survive. Applica esclusivamente le modifiche richieste a pasti, piano settimanale, obiettivi o lista spesa (inclusa la generazione/aggiornamento di shoppingList.items in base ai pasti pianificati). Mantieni tutti gli id esistenti e gli slot completed:true. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
         }
 
         function render() {
@@ -1637,7 +1665,6 @@
           renderWeek();
           renderShopping();
           $("exportText").value = mainPrompt();
-          $("shoppingPrompt").value = listPrompt();
         }
 
         function renderFilters() {
@@ -1721,28 +1748,34 @@
         function renderShopping() {
           const list = state.shoppingList || { items: [] };
           const items = Array.isArray(list.items) ? list.items : [];
-          $("shoppingMeta").textContent = items.length
-            ? `${items.filter((i) => i.checked).length}/${items.length} acquistati`
-            : "Non ancora generata";
+          const countText = items.length ? `${items.filter((i) => i.checked).length}/${items.length} acquistati` : "0 acquistati";
+          $("shoppingMainMeta").textContent = countText;
+
           if (!items.length) {
-            $("shoppingContent").innerHTML =
-              `<div class="empty-state"><strong>La lista è vuota</strong><p>Usa l'IA o rigenera la spesa.</p></div>`;
+            $("shoppingMainContent").innerHTML =
+              `<div class="empty-state"><strong>La lista è vuota</strong><p>Usa l'IA (AI Sync) per generarla in base ai pasti pianificati.</p></div>`;
             return;
           }
           const groups = {};
           items.forEach((item) => (groups[item.category || "Altro"] ||= []).push(item));
-          $("shoppingContent").innerHTML = `<div class="shopping-list">${Object.entries(groups)
+          $("shoppingMainContent").innerHTML = `<div class="shopping-list-container">${Object.entries(groups)
             .map(
               ([category, group]) =>
-                `<div class="category">${esc(category)}</div>${group
+                `<div><div class="category-title-header">${esc(category)}</div>${group
                   .map(
                     (item) => `
-            <div class="shopping-item ${item.checked ? "checked" : ""}">
-              <input type="checkbox" data-shopping="${esc(item.id)}" ${item.checked ? "checked" : ""}/>
-              <label><strong>${esc(item.name)}</strong><span>${esc(item.quantity || "Quantità da definire")}</span></label>
+            <div class="shopping-item-row ${item.checked ? "checked" : ""}">
+              <div class="shopping-item-left" data-shop-toggle="${esc(item.id)}">
+                <input type="checkbox" data-shopping="${esc(item.id)}" ${item.checked ? "checked" : ""}/>
+                <div class="shopping-item-info">
+                  <strong>${esc(item.name)}</strong>
+                  <span>${esc(item.quantity || "Quantità da definire")}</span>
+                </div>
+              </div>
+              <span class="shopping-category-badge">${esc(category)}</span>
             </div>`,
                   )
-                  .join("")}`,
+                  .join("")}</div>`,
             )
             .join("")}</div>`;
         }
@@ -1832,6 +1865,14 @@
           if (edit) { event.stopPropagation(); editMeal(edit.dataset.id); }
           const empty = event.target.closest(".empty-slot");
           if (empty) showPicker(empty.dataset.slot);
+          
+          // Click su un pasto pianificato da mobile o desktop: apre il selettore per cambiarlo o rimuoverlo
+          const plannedCard = event.target.closest(".planned");
+          if (plannedCard && !event.target.closest("input, button")) {
+            const key = plannedCard.dataset.planned;
+            showPicker(key);
+          }
+
           const pick = event.target.closest("[data-pick]");
           if (pick) {
             commit((current) => (current.schedule[pickerSlot] = { mealId: pick.dataset.pick, completed: false }));
@@ -1844,15 +1885,32 @@
           }
           const day = event.target.closest("[data-day]");
           if (day) { selectedDay = day.dataset.day; renderDays(); renderWeek(); }
+          
           const nav = event.target.closest("[data-view]");
           if (nav) {
             document.querySelectorAll(".mobile-nav button").forEach((b) => b.classList.toggle("active", b === nav));
-            if (nav.dataset.view === "shopping") open("shoppingOverlay");
-            else {
-              $("sidebar").classList.toggle("mobile-active", nav.dataset.view === "sidebar");
-              $("planner").classList.toggle("mobile-active", nav.dataset.view === "planner");
+            const view = nav.dataset.view;
+            $("planner").style.display = view === "planner" ? "block" : "none";
+            $("sidebar").style.display = view === "sidebar" ? "flex" : "none";
+            $("shoppingMain").style.display = view === "shopping" ? "block" : "none";
+            
+            // Per mobile
+            $("sidebar").classList.toggle("mobile-active", view === "sidebar");
+            $("planner").classList.toggle("mobile-active", view === "planner");
+            $("shoppingMain").classList.toggle("mobile-active", view === "shopping");
+          }
+
+          const shopRowToggle = event.target.closest("[data-shop-toggle]");
+          if (shopRowToggle) {
+            const itemId = shopRowToggle.dataset.shopToggle;
+            const item = state.shoppingList.items.find((i) => i.id === itemId);
+            if (item) {
+              item.checked = !item.checked;
+              syncToCloud();
+              renderShopping();
             }
           }
+
           const tab = event.target.closest("[data-tab]");
           if (tab) {
             document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", b === tab));
@@ -1983,15 +2041,18 @@
           commit((current) => (current.schedule = emptySchedule()));
           close("confirmOverlay");
         };
-        $("shoppingBtn").onclick = () => open("shoppingOverlay");
-        $("generateShoppingBtn").onclick = () => {
-          close("shoppingOverlay");
-          open("aiOverlay");
-          document.querySelector('[data-tab="shopping"]').click();
+
+        $("shoppingBtn").onclick = () => {
+          document.querySelectorAll(".mobile-nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === "shopping"));
+          $("planner").style.display = "none";
+          $("sidebar").style.display = "none";
+          $("shoppingMain").style.display = "block";
+          $("shoppingMain").classList.add("mobile-active");
         };
+
+        $("generateShoppingFromMain").onclick = () => { render(); open("aiOverlay"); };
         $("aiBtn").onclick = () => { render(); open("aiOverlay"); };
         $("copyBtn").onclick = async () => { await copyText(mainPrompt()); toast("Prompt copiato"); };
-        $("copyShoppingPrompt").onclick = async () => { await copyText(listPrompt()); toast("Richiesta copiata"); };
         $("downloadBtn").onclick = () => {
           const blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: "application/json" });
           const link = document.createElement("a");
@@ -2009,7 +2070,6 @@
         });
         $("applyImportBtn").onclick = applyImport;
 
-        // Avvio inizializzazione cloud sync
         initCloudSync();
         render();
       })();
