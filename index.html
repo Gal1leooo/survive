@@ -1635,9 +1635,7 @@
             };
           });
         const exportJson = JSON.stringify({ meals: state.meals, schedule: exportSchedule }, null, 2);
-        const aiPrompt = `Agisci come assistente per la pianificazione nutrizionale. Modifica i dati JSON seguenti secondo le mie indicazioni. Puoi aggiungere, modificare o rimuovere pasti e aggiornare gli slot. REGOLE OBBLIGATORIE: mantieni gli id dei pasti esistenti; genera id univoci per i nuovi pasti; non modificare mai completed:true; rispetta esattamente lo schema; restituisci soltanto JSON valido, senza markdown o spiegazioni.
-
-${exportJson}`;
+        const aiPrompt = `Agisci come assistente per la pianificazione nutrizionale. Modifica i dati JSON seguenti secondo le mie indicazioni. Puoi aggiungere, modificare o rimuovere pasti e aggiornare gli slot. REGOLE OBBLIGATORIE: mantieni gli id dei pasti esistenti; genera id univoci per i nuovi pasti; non modificare mai completed:true; rispetta esattamente lo schema; restituisci soltanto JSON valido, senza markdown o spiegazioni.\n\n${exportJson}`;
 
         const parseImport = () => {
           if (!importText.trim()) return { error: "Incolla una risposta JSON per continuare." };
@@ -2171,10 +2169,8 @@ ${exportJson}`;
                 </span>
                 <textarea
                   rows={4}
-                  value={form.ingredients.join("
-")}
-                  onChange={(e) => set("ingredients", e.target.value.split("
-").filter(Boolean))}
+                  value={form.ingredients.join("\n")}
+                  onChange={(e) => set("ingredients", e.target.value.split("\n").filter(Boolean))}
                   placeholder={"Ceci\nRiso basmati\nSpinaci"}
                 />
               </label>
