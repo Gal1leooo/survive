@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Survive — ricettario, piano settimanale, obiettivi nutrizionali e lista della spesa."
+      content="Survive — ricettario, piano settimanale, obiettivi nutrizionali e lista della spesa con sincronizzazione cloud."
     />
     <title>Survive — Meal Planner</title>
+    <!-- Supabase Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
       :root {
         --ink: #1e2924;
@@ -588,7 +590,8 @@
         font-weight: 700;
       }
       .field input,
-      .field textarea {
+      .field textarea,
+      .field select {
         width: 100%;
         padding: 10px 11px;
         border: 1px solid #d5ddd7;
@@ -944,8 +947,22 @@
           border-radius: 13px;
           color: #7b8981;
           background: transparent;
-          font-size: 9px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          font-size: 8px;
           font-weight: 700;
+        }
+        .mobile-nav button svg {
+          width: 20px;
+          height: 20px;
+          stroke: currentColor;
+          fill: none;
+          stroke-width: 2;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
         .mobile-nav button.active {
           color: #314a3d;
@@ -1051,9 +1068,18 @@
     </div>
 
     <nav class="mobile-nav glass">
-      <button data-view="planner" class="active">Piano</button>
-      <button data-view="sidebar">Pasti</button>
-      <button data-view="shopping">Spesa</button>
+      <button data-view="planner" class="active">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+        <span>Piano</span>
+      </button>
+      <button data-view="sidebar">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" /></svg>
+        <span>Pasti</span>
+      </button>
+      <button data-view="shopping">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
+        <span>Spesa</span>
+      </button>
     </nav>
     <button class="fab" id="fab" aria-label="Nuovo pasto">+</button>
 
@@ -1125,10 +1151,22 @@
           <button class="icon-button" data-close="targetsOverlay">×</button>
         </div>
         <div class="info">
-          Imposta i tuoi riferimenti. Le barre giornaliere confrontano i pasti pianificati con
-          questi valori; non costituiscono un consiglio medico.
+          Imposta i tuoi riferimenti nutrizionali giorno per giorno o globalmente. Le barre confrontano i pasti pianificati con questi valori.
         </div>
         <form id="targetsForm" class="targets-grid">
+          <label class="field wide"
+            >Giorno da configurare
+            <select id="targetDaySelect">
+              <option value="all">Tutti i giorni (Default)</option>
+              <option value="mon">Lunedì</option>
+              <option value="tue">Martedì</option>
+              <option value="wed">Mercoledì</option>
+              <option value="thu">Giovedì</option>
+              <option value="fri">Venerdì</option>
+              <option value="sat">Sabato</option>
+              <option value="sun">Domenica</option>
+            </select>
+          </label>
           <label class="field"
             >Energia (kcal)<input id="targetKcal" type="number" min="1" required
           /></label>
@@ -1164,9 +1202,8 @@
         </div>
         <section class="tab-panel" data-panel="export">
           <div class="info">
-            Il file contiene pasti, piano, obiettivi nutrizionali e una sezione
-            <strong>shoppingList</strong> dedicata alla lista della spesa. Condividilo con il tuo
-            Gem.
+            Il file contiene pasti, piano, obiettivi nutrizionali (inclusi quelli day-by-day) e la sezione
+            <strong>shoppingList</strong> integrata. Condividilo con il tuo Gem.
           </div>
           <label class="field"
             >Prompt + dati<textarea class="code" id="exportText" rows="16" readonly></textarea>
@@ -1182,14 +1219,14 @@
         <section class="tab-panel" data-panel="import" hidden>
           <div class="info">
             Incolla il JSON restituito dal Gem. Gli slot già completati vengono preservati se non
-            sono stati esplicitamente sostituiti.
+            sono stati esplicitamente sostituiti, e la lista della spesa viene aggiornata.
           </div>
           <label class="field"
             >Risposta JSON<textarea
               class="code"
               id="importText"
               rows="15"
-              placeholder='{"meals":[],"schedule":[],"nutritionTargets":{},"shoppingList":{}}'
+              placeholder='{"meals":[],"schedule":[],"nutritionTargets":{},"dayTargets":{},"shoppingList":{}}'
             ></textarea>
           </label>
           <div id="importFeedback"></div>
@@ -1257,6 +1294,16 @@
     <script>
       (() => {
         "use strict";
+
+        // CONFIGURAZIONE SUPABASE (Inserisci qui le tue credenziali)
+        const SUPABASE_URL = "https://kogxpropzaadlpotnnyr.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_wXNPcQNWaUeLqbZJWxqfQg_lh7bqZmb";
+        
+        let supabaseClient = null;
+        if (window.supabase && SUPABASE_URL.startsWith("http")) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        }
+
         const DAYS = [
           ["mon", "Lun", "Lunedì"],
           ["tue", "Mar", "Martedì"],
@@ -1267,8 +1314,9 @@
           ["sun", "Dom", "Domenica"],
         ];
         const SLOTS = ["lunch", "dinner"];
-        const STORE = "survive-state-v2";
-        const HISTORY = "survive-history-v2";
+        const STORE = "survive-state-v4";
+        const HISTORY = "survive-history-v4";
+
         const initialMeals = [
           {
             id: "meal-tofu-rice",
@@ -1361,6 +1409,7 @@
             tags: ["Veloce", "Senza lattosio"],
           },
         ];
+
         function emptySchedule() {
           const out = {};
           DAYS.forEach(([key]) =>
@@ -1368,6 +1417,7 @@
           );
           return out;
         }
+
         const initialState = {
           meals: initialMeals,
           schedule: Object.assign(emptySchedule(), {
@@ -1378,17 +1428,26 @@
             sun_lunch: { mealId: "meal-lentil-couscous", completed: false },
           }),
           nutritionTargets: { kcal: 2000, protein: 100, carbs: 250, fats: 65 },
-          shoppingList: { status: "not_generated", items: [], generatedAt: null, notes: "" },
+          dayTargets: {},
+          shoppingList: {
+            status: "generated",
+            items: [
+              { id: "s1", name: "Tofu al naturale", quantity: "200 g", category: "Frigo", checked: false },
+              { id: "s2", name: "Riso basmati", quantity: "80 g", category: "Dispensa", checked: false },
+              { id: "s3", name: "Zucchine", quantity: "1", category: "Verdura", checked: false },
+            ],
+            generatedAt: new Date().toISOString(),
+            notes: ""
+          },
         };
-        let state = load(STORE, initialState);
+
+        let state = loadLocal(STORE, initialState);
         state.schedule = Object.assign(emptySchedule(), state.schedule || {});
-        state.nutritionTargets = Object.assign(
-          {},
-          initialState.nutritionTargets,
-          state.nutritionTargets || {},
-        );
+        state.nutritionTargets = Object.assign({}, initialState.nutritionTargets, state.nutritionTargets || {});
+        state.dayTargets = state.dayTargets || {};
         state.shoppingList = Object.assign({}, initialState.shoppingList, state.shoppingList || {});
-        let history = load(HISTORY, []);
+        let history = loadLocal(HISTORY, []);
+
         let selectedDay = "mon";
         let activeFilter = "Tutti";
         let pickerSlot = null;
@@ -1400,7 +1459,8 @@
             /[&<>"']/g,
             (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c],
           );
-        function load(key, fallback) {
+
+        function loadLocal(key, fallback) {
           try {
             const value = JSON.parse(localStorage.getItem(key));
             return value || structuredClone(fallback);
@@ -1408,22 +1468,61 @@
             return structuredClone(fallback);
           }
         }
-        function save() {
+
+        function saveLocal() {
           localStorage.setItem(STORE, JSON.stringify(state));
           localStorage.setItem(HISTORY, JSON.stringify(history));
         }
+
+        // Sincronizzazione Cloud con Supabase
+        async function syncToCloud() {
+          saveLocal();
+          if (!supabaseClient) return;
+          try {
+            await supabaseClient
+              .from('survive_store')
+              .upsert({ id: 'main', state: state, updated_at: new Date() });
+          } catch (err) {
+            console.error("Errore sync cloud:", err);
+          }
+        }
+
+        async function initCloudSync() {
+          if (!supabaseClient) return;
+          try {
+            const { data, error } = await supabaseClient
+              .from('survive_store')
+              .select('state')
+              .eq('id', 'main')
+              .single();
+            if (data && data.state) {
+              state = data.state;
+              state.schedule = Object.assign(emptySchedule(), state.schedule || {});
+              state.nutritionTargets = Object.assign({}, initialState.nutritionTargets, state.nutritionTargets || {});
+              state.dayTargets = state.dayTargets || {};
+              state.shoppingList = Object.assign({}, initialState.shoppingList, state.shoppingList || {});
+              saveLocal();
+              render();
+            }
+          } catch (err) {
+            console.log("Nessun dato cloud trovato o offline, uso cache locale.");
+          }
+        }
+
         function commit(mutator) {
           history.push(structuredClone(state));
           history = history.slice(-5);
           mutator(state);
-          save();
+          syncToCloud();
           render();
         }
+
         function toast(message) {
           $("toast").textContent = message;
           $("toast").classList.add("show");
           setTimeout(() => $("toast").classList.remove("show"), 1700);
         }
+
         async function copyText(text) {
           try {
             await navigator.clipboard.writeText(text);
@@ -1438,15 +1537,18 @@
             area.remove();
           }
         }
-        function open(id) {
-          $(id).hidden = false;
+
+        function open(id) { $(id).hidden = false; }
+        function close(id) { $(id).hidden = true; }
+        function mealById(id) { return state.meals.find((meal) => meal.id === id); }
+
+        function getTargets(day) {
+          if (state.dayTargets && state.dayTargets[day]) {
+            return Object.assign({}, state.nutritionTargets, state.dayTargets[day]);
+          }
+          return state.nutritionTargets;
         }
-        function close(id) {
-          $(id).hidden = true;
-        }
-        function mealById(id) {
-          return state.meals.find((meal) => meal.id === id);
-        }
+
         function totalFor(day) {
           return SLOTS.reduce(
             (sum, slot) => {
@@ -1461,13 +1563,15 @@
             { kcal: 0, protein: 0, carbs: 0, fats: 0 },
           );
         }
+
         function macroHTML(meal) {
           return `<div class="macro-pills"><span class="kcal">${meal.kcal} kcal</span><span class="protein">P ${meal.protein}g</span><span class="carbs">C ${meal.carbs}g</span><span class="fats">G ${meal.fats}g</span></div>`;
         }
+
         function exportData() {
           return {
             app: "Survive",
-            schemaVersion: 2,
+            schemaVersion: 3,
             meals: state.meals,
             schedule: Object.entries(state.schedule).map(([id, value]) => {
               const [day, rawSlot] = id.split("_");
@@ -1480,6 +1584,7 @@
               };
             }),
             nutritionTargets: state.nutritionTargets,
+            dayTargets: state.dayTargets,
             shoppingList: state.shoppingList,
             aiInstructions: {
               allowedOperations: [
@@ -1487,14 +1592,13 @@
                 "update_meals",
                 "remove_meals",
                 "update_schedule",
+                "update_targets",
                 "generate_shopping_list",
               ],
               rules: [
                 "Mantieni gli id dei pasti esistenti e genera id univoci per i nuovi.",
-                "Non cambiare completed:true salvo richiesta esplicita dell'utente.",
-                "Non alterare dati non interessati dalla richiesta.",
-                "Per la lista della spesa usa solo i pasti assegnati, moltiplica gli ingredienti ripetuti, aggrega quantità compatibili e raggruppa per categoria.",
-                "Restituisci sempre l'intero oggetto JSON valido, senza markdown o spiegazioni.",
+                "Non cambiare completed:true salvo richiesta esplicita.",
+                "Restituisci sempre l'intero oggetto JSON valido, senza markdown.",
               ],
               shoppingListSchema: {
                 status: "generated",
@@ -1502,22 +1606,23 @@
                   {
                     id: "item-id",
                     name: "Ingrediente",
-                    quantity: "Quantità aggregata",
+                    quantity: "Quantità",
                     category: "Categoria",
                     checked: false,
                   },
                 ],
                 generatedAt: "ISO-8601",
-                notes: "Eventuali assunzioni",
               },
             },
           };
         }
+
         function mainPrompt() {
-          return `Sei l'assistente dati dell'app Survive. Applica esclusivamente le modifiche che ti chiederò a pasti, piano settimanale o lista della spesa. Rispetta aiInstructions e lo schema ricevuto. Mantieni tutti gli id esistenti, gli slot completed:true e i dati non coinvolti. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
+          return `Sei l'assistente dati dell'app Survive. Applica esclusivamente le modifiche richieste a pasti, piano settimanale, obiettivi o lista spesa. Mantieni tutti gli id esistenti e gli slot completed:true. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
         }
+
         function listPrompt() {
-          return `Sei l'assistente lista della spesa di Survive. Analizza i pasti effettivamente assegnati nello schedule del JSON seguente. Genera shoppingList.items aggregando gli ingredienti duplicati e le quantità compatibili, raggruppandoli per category. Non includere pasti non pianificati. Mantieni invariati meals, schedule, nutritionTargets e gli slot completed:true. Imposta shoppingList.status a "generated", generatedAt in ISO-8601 e checked:false per i nuovi elementi. Se le quantità non sono deducibili, usa una quantità descrittiva prudente e annota l'assunzione in shoppingList.notes. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
+          return `Genera shoppingList.items basandoti sui pasti nello schedule del JSON seguente. Restituisci SOLO l'intero JSON valido, senza markdown.\n\n${JSON.stringify(exportData(), null, 2)}`;
         }
 
         function render() {
@@ -1534,6 +1639,7 @@
           $("exportText").value = mainPrompt();
           $("shoppingPrompt").value = listPrompt();
         }
+
         function renderFilters() {
           const tags = ["Tutti", ...new Set(state.meals.flatMap((meal) => meal.tags || []))];
           $("filters").innerHTML = tags
@@ -1543,6 +1649,7 @@
             )
             .join("");
         }
+
         function renderMeals() {
           const query = $("searchInput").value.toLowerCase();
           const meals = state.meals.filter(
@@ -1564,20 +1671,23 @@
                 .join("")
             : `<div class="empty-state"><strong>Nessun risultato</strong><p>Prova un’altra ricerca o filtro.</p></div>`;
         }
+
         function renderDays() {
           $("mobileDays").innerHTML = DAYS.map(([key, short]) => {
             const total = totalFor(key);
             return `<button data-day="${key}" class="${selectedDay === key ? "active" : ""}">${short}<small>${total.kcal || "—"} kcal</small></button>`;
           }).join("");
         }
+
         function targetRow(label, value, target) {
           const percentage = target ? Math.round((value / target) * 100) : 0;
           return `<div class="target-row ${percentage > 100 ? "over" : ""}"><span>${label}</span><div class="progress"><i style="width:${Math.min(percentage, 100)}%"></i></div><strong>${percentage}%</strong></div>`;
         }
+
         function renderWeek() {
           $("weekGrid").innerHTML = DAYS.map(([day, , label]) => {
             const total = totalFor(day);
-            const targets = state.nutritionTargets;
+            const targets = getTargets(day);
             const bothDone = SLOTS.every((slot) => state.schedule[`${day}_${slot}`].completed);
             return `<section class="day-column ${selectedDay === day ? "selected" : ""}">
               <div class="day-head">
@@ -1594,6 +1704,7 @@
             </section>`;
           }).join("");
         }
+
         function slotHTML(key, slot) {
           const entry = state.schedule[key];
           const meal = mealById(entry.mealId);
@@ -1606,6 +1717,7 @@
               <label class="complete-control"><input type="checkbox" data-complete="${key}" ${entry.completed ? "checked" : ""}/> ${entry.completed ? "Pasto completato" : "Segna come completato"}</label>
             </article></div>`;
         }
+
         function renderShopping() {
           const list = state.shoppingList || { items: [] };
           const items = Array.isArray(list.items) ? list.items : [];
@@ -1614,7 +1726,7 @@
             : "Non ancora generata";
           if (!items.length) {
             $("shoppingContent").innerHTML =
-              `<div class="empty-state"><strong>La lista è vuota</strong><p>Esporta i dati, chiedi al tuo Gem di generare la lista e reimporta il JSON.</p></div>`;
+              `<div class="empty-state"><strong>La lista è vuota</strong><p>Usa l'IA o rigenera la spesa.</p></div>`;
             return;
           }
           const groups = {};
@@ -1651,6 +1763,7 @@
           $("deleteMealBtn").style.display = meal ? "" : "none";
           open("mealOverlay");
         }
+
         function showPicker(slot) {
           pickerSlot = slot;
           $("pickerList").innerHTML = state.meals
@@ -1661,48 +1774,26 @@
             .join("");
           open("pickerOverlay");
         }
+
         function parseImport() {
           const text = $("importText").value.trim();
           if (!text) return { error: "Incolla un JSON per continuare." };
           try {
             const data = JSON.parse(text);
-            if (
-              !data ||
-              !Array.isArray(data.meals) ||
-              (!Array.isArray(data.schedule) && typeof data.schedule !== "object")
-            )
-              return { error: "Schema non valido: meals e schedule sono obbligatori." };
-            for (const meal of data.meals) {
-              if (
-                !meal.id ||
-                !meal.title ||
-                ["kcal", "protein", "carbs", "fats", "prepTime"].some(
-                  (key) => typeof meal[key] !== "number",
-                )
-              )
-                return {
-                  error: `Scheda pasto non valida: ${meal.title || meal.id || "senza nome"}.`,
-                };
-            }
-            if (data.shoppingList && !Array.isArray(data.shoppingList.items))
-              return { error: "shoppingList.items deve essere un array." };
-            const oldMap = new Map(state.meals.map((meal) => [meal.id, meal]));
+            if (!data || !Array.isArray(data.meals) || (!Array.isArray(data.schedule) && typeof data.schedule !== "object"))
+              return { error: "Schema non valido." };
             return {
               data,
-              added: data.meals.filter((meal) => !oldMap.has(meal.id)).length,
-              updated: data.meals.filter(
-                (meal) =>
-                  oldMap.has(meal.id) &&
-                  JSON.stringify(meal) !== JSON.stringify(oldMap.get(meal.id)),
-              ).length,
-              removed: state.meals.filter((meal) => !data.meals.some((next) => next.id === meal.id))
-                .length,
+              added: data.meals.filter((meal) => !state.meals.some((m) => m.id === meal.id)).length,
+              updated: data.meals.filter((meal) => state.meals.some((m) => m.id === meal.id && JSON.stringify(m) !== JSON.stringify(meal))).length,
+              removed: state.meals.filter((meal) => !data.meals.some((next) => next.id === meal.id)).length,
               shopping: data.shoppingList?.items?.length || 0,
             };
           } catch {
-            return { error: "JSON non valido: controlla virgole, parentesi e virgolette." };
+            return { error: "JSON non valido." };
           }
         }
+
         function applyImport() {
           const result = parseImport();
           if (result.error) return;
@@ -1715,35 +1806,11 @@
                   { mealId: item.mealId || null, completed: Boolean(item.completed) },
                 ])
               : Object.entries(incoming.schedule);
-            const incomingKeys = new Set(entries.map(([key]) => key));
-            entries.forEach(([key, value]) => {
-              if (key in normalized) normalized[key] = value;
-            });
-            Object.entries(current.schedule).forEach(([key, old]) => {
-              if (
-                old.completed &&
-                (!incomingKeys.has(key) || normalized[key]?.mealId === old.mealId)
-              )
-                normalized[key] = old;
-            });
-            const valid = new Set(incoming.meals.map((meal) => meal.id));
-            Object.keys(normalized).forEach((key) => {
-              if (normalized[key].mealId && !valid.has(normalized[key].mealId))
-                normalized[key] = { mealId: null, completed: false };
-            });
-            current.meals = incoming.meals.map((meal) => ({
-              ...meal,
-              ingredients: meal.ingredients || [],
-              tags: meal.tags || [],
-              notes: meal.notes || "",
-            }));
+            entries.forEach(([key, value]) => { if (key in normalized) normalized[key] = value; });
+            current.meals = incoming.meals;
             current.schedule = normalized;
-            if (incoming.nutritionTargets)
-              current.nutritionTargets = Object.assign(
-                {},
-                current.nutritionTargets,
-                incoming.nutritionTargets,
-              );
+            if (incoming.nutritionTargets) current.nutritionTargets = incoming.nutritionTargets;
+            if (incoming.dayTargets) current.dayTargets = incoming.dayTargets;
             if (incoming.shoppingList) current.shoppingList = incoming.shoppingList;
           });
           $("importText").value = "";
@@ -1762,39 +1829,24 @@
             renderMeals();
           }
           const edit = event.target.closest(".edit-meal");
-          if (edit) {
-            event.stopPropagation();
-            editMeal(edit.dataset.id);
-          }
+          if (edit) { event.stopPropagation(); editMeal(edit.dataset.id); }
           const empty = event.target.closest(".empty-slot");
           if (empty) showPicker(empty.dataset.slot);
           const pick = event.target.closest("[data-pick]");
           if (pick) {
-            commit(
-              (current) =>
-                (current.schedule[pickerSlot] = { mealId: pick.dataset.pick, completed: false }),
-            );
+            commit((current) => (current.schedule[pickerSlot] = { mealId: pick.dataset.pick, completed: false }));
             close("pickerOverlay");
           }
           const remove = event.target.closest(".remove-slot");
           if (remove) {
             event.stopPropagation();
-            commit(
-              (current) =>
-                (current.schedule[remove.dataset.slot] = { mealId: null, completed: false }),
-            );
+            commit((current) => (current.schedule[remove.dataset.slot] = { mealId: null, completed: false }));
           }
           const day = event.target.closest("[data-day]");
-          if (day) {
-            selectedDay = day.dataset.day;
-            renderDays();
-            renderWeek();
-          }
+          if (day) { selectedDay = day.dataset.day; renderDays(); renderWeek(); }
           const nav = event.target.closest("[data-view]");
           if (nav) {
-            document
-              .querySelectorAll(".mobile-nav button")
-              .forEach((button) => button.classList.toggle("active", button === nav));
+            document.querySelectorAll(".mobile-nav button").forEach((b) => b.classList.toggle("active", b === nav));
             if (nav.dataset.view === "shopping") open("shoppingOverlay");
             else {
               $("sidebar").classList.toggle("mobile-active", nav.dataset.view === "sidebar");
@@ -1803,30 +1855,22 @@
           }
           const tab = event.target.closest("[data-tab]");
           if (tab) {
-            document
-              .querySelectorAll("[data-tab]")
-              .forEach((button) => button.classList.toggle("active", button === tab));
-            document
-              .querySelectorAll("[data-panel]")
-              .forEach((panel) => (panel.hidden = panel.dataset.panel !== tab.dataset.tab));
+            document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", b === tab));
+            document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== tab.dataset.tab));
           }
         });
+
         document.addEventListener("change", (event) => {
           if (event.target.matches("[data-complete]")) {
             const key = event.target.dataset.complete;
             commit((current) => (current.schedule[key].completed = event.target.checked));
           }
           if (event.target.matches("[data-shopping]")) {
-            const item = state.shoppingList.items.find(
-              (item) => item.id === event.target.dataset.shopping,
-            );
-            if (item) {
-              item.checked = event.target.checked;
-              save();
-              renderShopping();
-            }
+            const item = state.shoppingList.items.find((i) => i.id === event.target.dataset.shopping);
+            if (item) { item.checked = event.target.checked; syncToCloud(); renderShopping(); }
           }
         });
+
         document.addEventListener("dragstart", (event) => {
           const meal = event.target.closest("[data-meal]");
           const planned = event.target.closest("[data-planned]");
@@ -1842,9 +1886,7 @@
           event.preventDefault();
           const key = target.dataset.slot || target.dataset.planned;
           if (dragData.type === "meal")
-            commit(
-              (current) => (current.schedule[key] = { mealId: dragData.id, completed: false }),
-            );
+            commit((current) => (current.schedule[key] = { mealId: dragData.id, completed: false }));
           else if (dragData.id !== key)
             commit((current) => {
               const temp = current.schedule[key];
@@ -1868,15 +1910,9 @@
             protein: Number($("mealProtein").value),
             carbs: Number($("mealCarbs").value),
             fats: Number($("mealFats").value),
-            ingredients: $("mealIngredients")
-              .value.split("\n")
-              .map((v) => v.trim())
-              .filter(Boolean),
+            ingredients: $("mealIngredients").value.split("\n").map((v) => v.trim()).filter(Boolean),
             notes: $("mealNotes").value.trim(),
-            tags: $("mealTags")
-              .value.split(",")
-              .map((v) => v.trim())
-              .filter(Boolean),
+            tags: $("mealTags").value.split(",").map((v) => v.trim()).filter(Boolean),
           };
           commit((current) => {
             const index = current.meals.findIndex((item) => item.id === id);
@@ -1885,6 +1921,7 @@
           });
           close("mealOverlay");
         };
+
         $("deleteMealBtn").onclick = () => {
           const id = $("mealId").value;
           commit((current) => {
@@ -1896,32 +1933,51 @@
           });
           close("mealOverlay");
         };
+
         $("undoBtn").onclick = () => {
           if (!history.length) return;
           state = history.pop();
-          save();
+          syncToCloud();
           render();
           toast("Ultima modifica annullata");
         };
+
+        const targetDaySelect = $("targetDaySelect");
+        function updateTargetModalValues(dayKey) {
+          let targets = dayKey === "all" ? state.nutritionTargets : ((state.dayTargets && state.dayTargets[dayKey]) || state.nutritionTargets);
+          $("targetKcal").value = targets.kcal;
+          $("targetProtein").value = targets.protein;
+          $("targetCarbs").value = targets.carbs;
+          $("targetFats").value = targets.fats;
+        }
+        targetDaySelect.onchange = () => updateTargetModalValues(targetDaySelect.value);
         $("targetsBtn").onclick = () => {
-          ["Kcal", "Protein", "Carbs", "Fats"].forEach(
-            (key) => ($(`target${key}`).value = state.nutritionTargets[key.toLowerCase()]),
-          );
+          targetDaySelect.value = "all";
+          updateTargetModalValues("all");
           open("targetsOverlay");
         };
         $("targetsForm").onsubmit = (event) => {
           event.preventDefault();
-          commit(
-            (current) =>
-              (current.nutritionTargets = {
-                kcal: Number($("targetKcal").value),
-                protein: Number($("targetProtein").value),
-                carbs: Number($("targetCarbs").value),
-                fats: Number($("targetFats").value),
-              }),
-          );
+          const dayKey = targetDaySelect.value;
+          const newValues = {
+            kcal: Number($("targetKcal").value),
+            protein: Number($("targetProtein").value),
+            carbs: Number($("targetCarbs").value),
+            fats: Number($("targetFats").value),
+          };
+          commit((current) => {
+            if (dayKey === "all") {
+              current.nutritionTargets = newValues;
+              current.dayTargets = {};
+            } else {
+              current.dayTargets = current.dayTargets || {};
+              current.dayTargets[dayKey] = newValues;
+            }
+          });
           close("targetsOverlay");
+          toast("Obiettivi aggiornati");
         };
+
         $("resetBtn").onclick = () => open("confirmOverlay");
         $("confirmResetBtn").onclick = () => {
           commit((current) => (current.schedule = emptySchedule()));
@@ -1933,22 +1989,11 @@
           open("aiOverlay");
           document.querySelector('[data-tab="shopping"]').click();
         };
-        $("aiBtn").onclick = () => {
-          render();
-          open("aiOverlay");
-        };
-        $("copyBtn").onclick = async () => {
-          await copyText(mainPrompt());
-          toast("Prompt copiato");
-        };
-        $("copyShoppingPrompt").onclick = async () => {
-          await copyText(listPrompt());
-          toast("Richiesta copiata");
-        };
+        $("aiBtn").onclick = () => { render(); open("aiOverlay"); };
+        $("copyBtn").onclick = async () => { await copyText(mainPrompt()); toast("Prompt copiato"); };
+        $("copyShoppingPrompt").onclick = async () => { await copyText(listPrompt()); toast("Richiesta copiata"); };
         $("downloadBtn").onclick = () => {
-          const blob = new Blob([JSON.stringify(exportData(), null, 2)], {
-            type: "application/json",
-          });
+          const blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: "application/json" });
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           link.download = `survive-${new Date().toISOString().slice(0, 10)}.json`;
@@ -1963,6 +2008,9 @@
             : `<div class="preview"><div><span>Nuovi pasti</span><strong>+${result.added}</strong></div><div><span>Aggiornati</span><strong>${result.updated}</strong></div><div><span>Rimossi</span><strong>${result.removed}</strong></div><div><span>Lista spesa</span><strong>${result.shopping}</strong></div></div>`;
         });
         $("applyImportBtn").onclick = applyImport;
+
+        // Avvio inizializzazione cloud sync
+        initCloudSync();
         render();
       })();
     </script>
